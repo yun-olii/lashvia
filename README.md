@@ -27,4 +27,15 @@ source .venv/bin/activate
 
 streamlit run app.py
 
+## 使用注意事项
+-**输入文件说明**
+
+库存表必须包含名称、日期、SKU、期初库存（承接）、当日入库、期末库存、安全库存
+
+销量表必须包含日期、SKU、数量
+
+换货表必须包含日期、数量、原款SKU、换款SKU
+
+中文 CSV 建议保存为 UTF-8-SIG 编码，以避免乱码。
+
 Last Update: 08/22/2025
