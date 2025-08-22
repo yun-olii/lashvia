@@ -1,5 +1,5 @@
 # Lashvia Inventory Management System (Streamlit)
-This project is based on Streamlit. It supports sales integration, generates inventory updates results and provides a glimpse of sales performance, which is convinent for e-commerce daily operation. 
+This project is based on Streamlit. It supports sales integration, generates inventory updates results and provides a glimpse of sales performance, which is great for e-commerce daily operation. 
 
 本项目是一个基于 [Streamlit](https://streamlit.io/) 的库存管理工具。支持自动承接库存、整合销量、处理换货，并生成库存更新结果表格，方便团队日常运营。
 
