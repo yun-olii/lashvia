@@ -281,14 +281,60 @@ if st.button("开始处理"):
     st.code("\n".join(today_view.loc[today_view["SKU"]!="—","期末库存"].astype(str).tolist()), language="text")
 
 
-    csv_out = summary_df.to_csv(index_label="序号").encode("utf-8-sig")
-    st.download_button(label="下载库存更新表 CSV", data=csv_out, file_name=f"库存更新结果_{work_date}.csv", mime="text/csv")
+    # ========== A) 运营视图导出（含合计；给日常查看/汇报） ==========
+    csv_out_view = summary_df.to_csv(index_label="序号").encode("utf-8-sig")
+    st.download_button(
+        label="下载【运营视图】库存更新表 CSV（含合计）",
+        data=csv_out_view,
+        file_name=f"库存更新结果_{work_date}.csv",
+        mime="text/csv"
+    )
 
-    out = BytesIO()
-    with pd.ExcelWriter(out, engine="openpyxl") as writer:
-        summary_df.to_excel(writer, index_label="序号")
-    st.download_button(label="下载库存更新表 Excel", data=out.getvalue(), file_name="库存更新结果.xlsx")
 
+    # ========== B) 回填版导出（严格匹配库存表列序 + 含日期 + 无合计行） ==========
+    # 基于今天的行，补“当日销量”
+    paste_view = stock_df.loc[day_mask, :].copy()
+    paste_view["当日销量"] = sold_today.values  # 我们新算的销量
+
+    # 根据库存表原列序，把“当日销量”插在合适位置：
+    # 规则：优先插在“当日入库”之后；否则插在“期末库存”之前；两者都没有就放末尾
+    orig_cols = list(stock_df.columns)
+
+    def with_sales_in_order(orig_cols):
+        cols = []
+        inserted = False
+        for c in orig_cols:
+            cols.append(c)
+            if c == "当日入库" and not inserted:
+                cols.append("当日销量")
+                inserted = True
+        if not inserted:
+            if "期末库存" in cols:
+                idx = cols.index("期末库存")
+                cols.insert(idx, "当日销量")
+            else:
+                cols.append("当日销量")
+        return cols
+
+    export_cols = with_sales_in_order(orig_cols)
+    # 只取 paste_view 里真实存在的列（防止库存表有别的额外列）
+    export_cols = [c for c in export_cols if c in paste_view.columns]
+
+    paste_df = paste_view[export_cols].copy()
+
+    # 可选：把常见数值列转为整数，避免 1.0 的显示
+    for c in ["初期库存（承接）","当日入库","当日销量","期末库存","安全库存数"]:
+        if c in paste_df.columns:
+            paste_df[c] = pd.to_numeric(paste_df[c], errors="coerce").fillna(0).astype(int)
+
+    # 回填版：不含合计行，方便直接粘贴回你的库存长表
+    csv_out_paste = paste_df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        label="下载【回填版】库存更新表 CSV（列序匹配库存表，含日期，无合计）",
+        data=csv_out_paste,
+        file_name=f"库存更新回填_{work_date}.csv",
+        mime="text/csv"
+    )
     # ---------- ⑦ 历史记录 ----------
     history_file = "upload_history.csv"
     record = {
@@ -298,13 +344,10 @@ if st.button("开始处理"):
         "销量文件数": len(sales_files) if sales_files else 0,
         "是否开启换货区": st.session_state.show_exchange
     }
-    try:
-        if os.path.exists(history_file):
-            hist = pd.read_csv(history_file)
-            hist = pd.concat([hist, pd.DataFrame([record])], ignore_index=True)
-        else:
-            hist = pd.DataFrame([record])
-        hist.to_csv(history_file, index=False, encoding="utf-8-sig")
-        st.success("已记录历史。")
-    except OSError as e:
-        st.warning(f"历史记录未落地（环境只读）。详情：{e}")
+    if os.path.exists(history_file):
+        hist = pd.read_csv(history_file)
+        hist = pd.concat([hist, pd.DataFrame([record])], ignore_index=True)
+    else:
+        hist = pd.DataFrame([record])
+    hist.to_csv(history_file, index=False, encoding="utf-8-sig")
+    st.success("已记录历史。")
